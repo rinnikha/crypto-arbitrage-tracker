@@ -91,7 +91,7 @@ class BitgetCollector(BaseCollector):
         for side in ["sell", "buy"]:  # sell=merchant sells (user buys), buy=merchant buys (user sells)
             params = {
                 "coin": "USDT",
-                "fiat": 'RUB',
+                "fiat": 'USD',
                 "side": side,
                 "status": "online",
                 "startTime": orders_timestamp,
