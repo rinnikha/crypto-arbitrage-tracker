@@ -17,7 +17,7 @@ class BybitCollector(BaseCollector):
         self.api_key = api_key
         self.api_secret = api_secret
         self.base_url = "https://api.bybit.com"
-        self.p2p_url = "https://api.bybit.com/v5/spot/c2c/advertisement/list"
+        self.p2p_url = "https://api2.bybit.com/fiat/otc/item/online"
     
     def _generate_signature(self, params, timestamp):
         """Generate signature for Bybit API requests."""
@@ -53,98 +53,62 @@ class BybitCollector(BaseCollector):
     def fetch_p2p_orders(self, asset: str) -> List[P2POrderDTO]:
         """Fetch P2P orders from Bybit."""
         orders = []
+
+        for side in ['sell', 'buy']:
+            payload= {
+                # "userId": 26473217,
+                "tokenId": asset,
+                "currencyId": "USD",
+                "payment": [],
+                "side": "0" if side == 'sell' else "1",
+                "size": "20",
+                "page": "1",
+                "amount": "",
+                "vaMaker": False,
+                "bulkMaker": False,
+                "canTrade": False,
+                "verificationFilter": 0,
+                "sortType": "TRADE_PRICE",
+                "paymentPeriod": [],
+                "itemRegion": 1
+            }
+
+            try:
+                response = make_request(
+                    url=self.p2p_url,
+                    method="POST",
+                    data=payload,
+                )
+
+                if response.json().get('ret_code') != 0:
+                    print(f"API Error: {response.json().get('msg')}")
+                    continue
+
+                for adv in response.json()['result'].get('items', []):
+                    orders.append(self._create_order_dto(adv, side))
         
-        # For buy orders
-        buy_params = {
-            "tokenId": asset,
-            "currencyId": "USD",
-            "side": "1",  # 1 for buy, 2 for sell
-            "page": 1,
-            "size": 20
-        }
-        
-        try:
-            buy_headers = self._get_headers(buy_params)
-            
-            buy_response = make_request(
-                url=self.p2p_url,
-                method="GET",
-                params=buy_params,
-                headers=buy_headers
-            )
-            
-            buy_data = buy_response.json()
-            
-            # Process buy orders
-            if buy_data.get('retCode') == 0 and 'result' in buy_data:
-                for adv in buy_data['result'].get('items', []):
-                    user = adv.get('advertiserInfo', {})
-                    
-                    order = P2POrderDTO(
-                        exchange_name="Bybit",
-                        asset_symbol=asset,
-                        price=float(adv.get('price', 0)),
-                        order_type="BUY",
-                        available_amount=float(adv.get('quantity', 0)),
-                        min_amount=float(adv.get('minAmount', 0)),
-                        max_amount=float(adv.get('maxAmount', 0)),
-                        payment_methods=[pm.get('identifier') for pm in adv.get('payments', [])],
-                        # New fields
-                        order_id=adv.get('advertisementId'),
-                        user_id=user.get('userId'),
-                        user_name=user.get('nickName', 'Unknown'),
-                        completion_rate=float(user.get('completionRate', 0)) * 100  # Convert to percentage
-                    )
-                    orders.append(order)
-        except Exception as e:
-            print(f"Error fetching Bybit BUY orders: {e}")
-        
-        # For sell orders
-        sell_params = {
-            "tokenId": asset,
-            "currencyId": "USD",
-            "side": "2",  # 1 for buy, 2 for sell
-            "page": 1,
-            "size": 20
-        }
-        
-        try:
-            sell_headers = self._get_headers(sell_params)
-            
-            sell_response = make_request(
-                url=self.p2p_url,
-                method="GET",
-                params=sell_params,
-                headers=sell_headers
-            )
-            
-            sell_data = sell_response.json()
-            
-            # Process sell orders
-            if sell_data.get('retCode') == 0 and 'result' in sell_data:
-                for adv in sell_data['result'].get('items', []):
-                    user = adv.get('advertiserInfo', {})
-                    
-                    order = P2POrderDTO(
-                        exchange_name="Bybit",
-                        asset_symbol=asset,
-                        price=float(adv.get('price', 0)),
-                        order_type="SELL",
-                        available_amount=float(adv.get('quantity', 0)),
-                        min_amount=float(adv.get('minAmount', 0)),
-                        max_amount=float(adv.get('maxAmount', 0)),
-                        payment_methods=[pm.get('identifier') for pm in adv.get('payments', [])],
-                        # New fields
-                        order_id=adv.get('advertisementId'),
-                        user_id=user.get('userId'),
-                        user_name=user.get('nickName', 'Unknown'),
-                        completion_rate=float(user.get('completionRate', 0)) * 100  # Convert to percentage
-                    )
-                    orders.append(order)
-        except Exception as e:
-            print(f"Error fetching Bybit SELL orders: {e}")
-        
+            except Exception as e:
+                print(f"Error fetching {side} orders: {str(e)}")
+    
         return orders
+    
+    def _create_order_dto(self, adv, side):
+        return P2POrderDTO(
+            exchange_name="Bybit",
+            asset_symbol=adv['tokenId'].upper(),
+            fiat_code=adv['currencyId'].upper(),
+            price=float(adv.get('price', 0)),
+            order_type="BUY" if side == 'sell' else 'SELL',
+            available_amount=float(adv.get('quantity', 0)),
+            min_amount=float(adv.get('minAmount', 0)),
+            max_amount=float(adv.get('maxAmount', 0)),
+            payment_methods=adv['payments'],
+            # New fields
+            order_id=adv.get('id'),
+            user_id=adv.get('userId'),
+            user_name=adv.get('nickName', 'Unknown'),
+            completion_rate=float(adv.get('recentExecuteRate', 0))  # Convert to percentage
+        )
     
     @retry_on_failure(max_retries=3)
     def fetch_spot_pairs(self, base_asset: Optional[str] = None, 
@@ -190,8 +154,8 @@ class BybitCollector(BaseCollector):
                         exchange_name="Bybit",
                         symbol=symbol,
                         price=float(ticker.get('lastPrice', 0)),
-                        bid_price=float(ticker.get('bid1Price', 0)),
-                        ask_price=float(ticker.get('ask1Price', 0)),
+                        bid_price=float(ticker.get('bid1Price', 0)) if ticker.get('bid1Price') != '' else 0,
+                        ask_price=float(ticker.get('ask1Price', 0)) if ticker.get('ask1Price') != '' else 0,
                         volume_24h=float(ticker.get('volume24h', 0)),
                         high_24h=float(ticker.get('highPrice24h', 0)),
                         low_24h=float(ticker.get('lowPrice24h', 0)),

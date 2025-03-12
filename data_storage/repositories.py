@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 
-from core.models import Exchange, Asset, P2PSnapshot, SpotSnapshot, P2POrder, SpotPair
+from core.models import Exchange, Asset, Fiat, P2PSnapshot, SpotSnapshot, P2POrder, SpotPair
 from core.dto import P2POrderDTO, SpotPairDTO
 from config.exchanges import ASSETS, EXCHANGE_SETTINGS
 
@@ -72,11 +72,23 @@ class P2PRepository:
             self.db.add(asset)
             self.db.commit()
             self.db.refresh(asset)
+
+        # Get or create Fiat
+        fiat = self.db.query(Fiat).filter_by(code=order_data.fiat_code).first()
+        if not fiat:
+            fiat = Fiat(
+                code=order_data.fiat_code,
+                name=order_data.fiat_code
+            )
+            self.db.add(fiat)
+            self.db.commit()
+            self.db.refresh(fiat)
         
         # Create P2POrder
         order = P2POrder(
             exchange_id=exchange.id,
             asset_id=asset.id,
+            fiat_id=fiat.id,
             snapshot_id=snapshot.id,
             price=order_data.price,
             order_type=order_data.order_type,

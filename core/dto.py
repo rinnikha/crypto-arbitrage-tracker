@@ -8,6 +8,7 @@ class P2POrderDTO:
     """Data Transfer Object for P2P orders."""
     exchange_name: str
     asset_symbol: str
+    fiat_code: str
     price: float
     order_type: str  # BUY, SELL
     available_amount: Optional[float] = None

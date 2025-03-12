@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
+
 import threading
 
 from api.app import create_api, run_api
@@ -14,7 +15,7 @@ from data_storage.snapshots import P2PSnapshotManager, SpotSnapshotManager
 from data_collection.api_clients.binance import BinanceCollector
 from data_collection.api_clients.bitget import BitgetCollector
 from data_collection.api_clients.bybit import BybitCollector
-from data_collection.api_clients.mixc import MixcCollector
+from data_collection.api_clients.mexc import MexcCollector
 from data_collection.api_clients.ton_wallet import TonWalletCollector
 from data_storage.repositories import P2PRepository, SpotRepository
 from config.exchanges import EXCHANGE_SETTINGS, ASSETS
@@ -65,7 +66,7 @@ def setup_scheduler(p2p_manager, spot_manager):
     # Schedule P2P snapshot creation
     scheduler.add_job(
         lambda: create_p2p_snapshot(p2p_manager), 
-        'interval', 
+        'interval',
         minutes=SNAPSHOT_INTERVAL_MINUTES,
         id='p2p_snapshot'
     )
@@ -85,10 +86,10 @@ def setup_scheduler(p2p_manager, spot_manager):
 def main():
     """Main entry point."""
     logger.info("Initializing Crypto Arbitrage Tracker...")
-    
+
     # Initialize the database
     engine = init_database()
-    
+
     # Create a session
     session = next(get_db(engine))
     
@@ -112,23 +113,34 @@ def main():
     
     # Bybit collector
     if EXCHANGE_SETTINGS["bybit"]["enabled"]:
+        
+        
         collectors.append(BybitCollector(
             api_key=EXCHANGE_SETTINGS["bybit"]["api_key"],
             api_secret=EXCHANGE_SETTINGS["bybit"]["api_secret"]
         ))
+
+        
     
     # MEXC collector
-    if EXCHANGE_SETTINGS["mixc"]["enabled"]:
-        collectors.append(MixcCollector(
-            api_key=EXCHANGE_SETTINGS["mixc"]["api_key"],
-            api_secret=EXCHANGE_SETTINGS["mixc"]["api_secret"]
+    if EXCHANGE_SETTINGS["mexc"]["enabled"]:
+        
+
+        collectors.append(MexcCollector(
+            api_key=EXCHANGE_SETTINGS["mexc"]["api_key"],
+            api_secret=EXCHANGE_SETTINGS["mexc"]["api_secret"]
         ))
     
     # TON Wallet collector
-    if EXCHANGE_SETTINGS["ton_wallet"]["enabled"]:
-        collectors.append(TonWalletCollector(
-            api_token=EXCHANGE_SETTINGS["ton_wallet"]["api_token"]
-        ))
+    # if EXCHANGE_SETTINGS["ton_wallet"]["enabled"]:
+    #     client = TonWalletCollector(api_token=EXCHANGE_SETTINGS["ton_wallet"]["api_token"])
+    #     client.fetch_p2p_orders(ASSETS)
+    #
+    #     collectors.append(TonWalletCollector(
+    #         api_token=EXCHANGE_SETTINGS["ton_wallet"]["api_token"]
+    #     ))
+
+
     
     # Repositories
     p2p_repo = P2PRepository(session)
@@ -147,6 +159,7 @@ def main():
         base_assets=ASSETS,
         quote_assets=["USDT", "USD"]  # Quote assets to track
     )
+
     
     # Set up and start the scheduler
     scheduler = setup_scheduler(p2p_manager, spot_manager)

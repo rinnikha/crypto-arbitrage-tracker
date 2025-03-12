@@ -18,7 +18,7 @@ crypto-arbitrage-tracker/
 │   │   ├── binance.py
 │   │   ├── bitget.py
 │   │   ├── bybit.py
-│   │   ├── mixc.py
+│   │   ├── mexc.py
 │   │   └── ton_wallet.py
 │   └── scrapers/             # Web scrapers (when APIs unavailable)
 │       ├── __init__.py

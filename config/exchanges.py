@@ -32,10 +32,10 @@ EXCHANGE_SETTINGS = {
         "p2p_url": "https://api.bybit.com/v5/spot/c2c/order-book",
         "fiat_currencies": ["USD", "EUR"]
     },
-    "mixc": {
-        "enabled": os.getenv("MIXC_ENABLED", "True").lower() == "true",
-        "api_key": os.getenv("MIXC_API_KEY", ""),
-        "api_secret": os.getenv("MIXC_API_SECRET", ""),
+    "mexc": {
+        "enabled": os.getenv("MEXC_ENABLED", "True").lower() == "true",
+        "api_key": os.getenv("MEXC_API_KEY", ""),
+        "api_secret": os.getenv("MEXC_API_SECRET", ""),
         "base_url": "https://api.mexc.com",
         "p2p_url": "https://otc.mexc.com/api",
         "fiat_currencies": ["USD"]

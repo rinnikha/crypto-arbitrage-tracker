@@ -32,6 +32,17 @@ class Asset(Base):
     quote_pairs = relationship("SpotPair", foreign_keys="SpotPair.quote_asset_id", back_populates="quote_asset")
     p2p_orders = relationship("P2POrder", back_populates="asset")
 
+class Fiat(Base):
+    """Model for cryptocurrency assets."""
+    __tablename__ = "fiats"
+    
+    id = Column(Integer, primary_key=True)
+    code = Column(String, unique=True, nullable=False)
+    name = Column(String)
+    created_at = Column(DateTime, default=datetime.now)
+    
+    p2p_orders = relationship("P2POrder", back_populates="fiat")
+
 class P2PSnapshot(Base):
     """Model for snapshots of P2P market data."""
     __tablename__ = "p2p_snapshots"
@@ -79,6 +90,7 @@ class P2POrder(Base):
     
     exchange = relationship("Exchange", back_populates="p2p_orders")
     asset = relationship("Asset", back_populates="p2p_orders")
+    fiat = relationship("Fiat", back_populates="p2p_orders")
     snapshot = relationship("P2PSnapshot", back_populates="orders")
 
 class SpotPair(Base):

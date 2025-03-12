@@ -38,19 +38,19 @@ class BinanceCollector(BaseCollector):
         # For buy orders (buying crypto, selling fiat)
         buy_payload = {
             "asset": asset,
-            "fiat": "USD",  # This could be configurable
+            "fiat": "UZS",  # This could be configurable
             "page": 1,
             "rows": 20,
-            "tradeType": "BUY"
+            "tradeType": "SELL"
         }
         
         # For sell orders (selling crypto, buying fiat)
         sell_payload = {
             "asset": asset,
-            "fiat": "USD",
+            "fiat": "UZS",
             "page": 1,
             "rows": 20,
-            "tradeType": "SELL"
+            "tradeType": "BUY"
         }
 
         orders = []
@@ -73,6 +73,7 @@ class BinanceCollector(BaseCollector):
             order = P2POrderDTO(
                 exchange_name="Binance",
                 asset_symbol=asset,
+                fiat_code='USD',
                 price=float(adv.get('price')),
                 order_type="BUY",
                 available_amount=float(adv.get('tradableQuantity', 0)),
@@ -104,6 +105,7 @@ class BinanceCollector(BaseCollector):
             order = P2POrderDTO(
                 exchange_name="Binance",
                 asset_symbol=asset,
+                fiat_code='USD',
                 price=float(adv.get('price')),
                 order_type="SELL",
                 available_amount=float(adv.get('tradableQuantity', 0)),

@@ -14,7 +14,7 @@ from core.dto import P2POrderDTO, SpotPairDTO
 from data_collection.base import BaseCollector
 from core.utils import retry_on_failure, make_request
 
-orders_timestamp = int(time.time() * 1000) - (50 * 24 * 60 * 60 * 1000)
+orders_timestamp = int(time.time() * 1000) - (89 * 24 * 60 * 60 * 1000)
 
 class BitgetCollector(BaseCollector):
     """Collector for Bitget exchange data."""
@@ -91,10 +91,11 @@ class BitgetCollector(BaseCollector):
         for side in ["sell", "buy"]:  # sell=merchant sells (user buys), buy=merchant buys (user sells)
             params = {
                 "coin": "USDT",
-                "fiat": 'USD',
+                "fiat": "RUB",
                 "side": side,
                 "status": "online",
-                "startTime": orders_timestamp,
+                "orderBy": "price",
+                # "startTime": orders_timestamp,
                 "sourceType": "competitior"
             }
             
@@ -105,10 +106,14 @@ class BitgetCollector(BaseCollector):
                     params=self.sort_params(params),
                     headers=self._get_headers("GET", endpoint, params)
                 )
+
+                data = response.json()
                 
                 if response.json().get('code') != '00000':
                     print(f"API Error: {response.json().get('msg')}")
                     continue
+
+                advCount = len(response.json()['data'].get('advList', []))
                     
                 for adv in response.json()['data'].get('advList', []):
                     orders.append(self._create_order_dto(adv, side))
@@ -122,17 +127,17 @@ class BitgetCollector(BaseCollector):
         return P2POrderDTO(
             exchange_name="Bitget",
             asset_symbol=adv['coin'].upper(),
-            
+            fiat_code=adv['fiat'].upper(),
             price=float(adv['price']),
             order_type="BUY" if side == "sell" else "SELL",
-            available_amount=float(adv['surplusAmount']),
-            min_amount=float(adv['minAmount']),
-            max_amount=float(adv['maxAmount']),
-            payment_methods=[pm['payType'] for pm in adv['payMethods']],
+            available_amount=float(adv['advSize']),
+            min_amount=float(adv['minTradeAmount']),
+            max_amount=float(adv['maxTradeAmount']),
+            payment_methods=[pm['paymentMethod'] for pm in adv['paymentMethodList']],
             order_id=adv['advNo'],
-            user_id=adv['merchantId'],
-            user_name=adv['merchant']['nickName'],
-            completion_rate=float(adv['merchant']['finishRate']) * 100
+            user_id='',
+            user_name='',
+            completion_rate=float(adv['turnoverRate']) * 100
         )
     
     @retry_on_failure(max_retries=3)
