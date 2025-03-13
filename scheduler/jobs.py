@@ -1,6 +1,6 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
-from data_storage.snapshots import SnapshotManager
+# from data_storage.snapshots import SnapshotManager
 
 def create_snapshot_job(snapshot_manager):
     """Job to create a new snapshot of exchange data."""

@@ -2,7 +2,7 @@
 import sys
 import logging
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, NullPool, QueuePool
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 
@@ -37,7 +37,14 @@ logger = logging.getLogger(__name__)
 def init_database():
     """Initialize the database."""
     logger.info("Initializing database...")
-    engine = create_engine(DATABASE_URL)
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=QueuePool,
+        pool_size=10,
+        max_overflow=20,
+        pool_timeout=30,
+        pool_recycle=1800
+    )
     Base.metadata.create_all(bind=engine)
     return engine
 
@@ -45,7 +52,7 @@ def create_p2p_snapshot(p2p_manager):
     """Job to create a new P2P snapshot."""
     try:
         logger.info(f"Creating P2P snapshot at {datetime.now()}")
-        result = p2p_manager.create_snapshot()
+        result = p2p_manager.create_snapshot_concurrent()
         logger.info(f"Created P2P snapshot {result['snapshot_id']} with {result['total_orders']} orders")
     except Exception as e:
         logger.exception(f"Error creating P2P snapshot: {e}")
@@ -54,7 +61,7 @@ def create_spot_snapshot(spot_manager):
     """Job to create a new spot snapshot."""
     try:
         logger.info(f"Creating spot snapshot at {datetime.now()}")
-        result = spot_manager.create_snapshot()
+        result = spot_manager.create_snapshot_concurrent()
         logger.info(f"Created spot snapshot {result['snapshot_id']} with {result['total_pairs']} pairs")
     except Exception as e:
         logger.exception(f"Error creating spot snapshot: {e}")

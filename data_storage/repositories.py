@@ -107,6 +107,88 @@ class P2PRepository:
         self.db.refresh(order)
         
         return order
+
+    def add_orders_batch(self, snapshot: P2PSnapshot, orders: List[P2POrderDTO]) -> None:
+        """Add multiple P2P orders in a batch operation."""
+        # Collect all exchanges, asset, and fiats first
+        exchange_map = {}
+        asset_map = {}
+        fiat_map = {}
+
+        # Preload or create all referenced entities
+        for order_data in orders:
+            if order_data.exchange_name not in exchange_map:
+                exchange = self.db.query(Exchange).filter_by(name=order_data.exchange_name).first()
+                if not exchange:
+                    # Create new exchange
+                    exchange_settings = next(
+                        (s for k, s in EXCHANGE_SETTINGS.items()
+                         if k.lower() == order_data.exchange_name.lower() or
+                         s['base_url'].find(order_data.exchange_name.lower()) != -1),
+                        {}
+                    )
+                    exchange = Exchange(
+                        name=order_data.exchange_name,
+                        base_url=exchange_settings.get('base_url', ''),
+                        p2p_url=exchange_settings.get('p2p_url', '')
+                    )
+                    self.db.add(exchange)
+                    self.db.commit()
+                    self.db.refresh(exchange)
+
+                exchange_map[order_data.exchange_name] = exchange
+
+            # Get or create Asset
+            if order_data.asset_symbol not in asset_map:
+                asset = self.db.query(Asset).filter_by(symbol=order_data.asset_symbol).first()
+                if not asset:
+                    asset = Asset(
+                        symbol=order_data.asset_symbol,
+                        name=order_data.asset_symbol
+                    )
+                    self.db.add(asset)
+                    self.db.commit()
+                    self.db.refresh(asset)
+                asset_map[order_data.asset_symbol] = asset
+
+            # Get or create Fiat
+            if order_data.fiat_code not in fiat_map:
+                fiat = self.db.query(Fiat).filter_by(code=order_data.fiat_code).first()
+                if not fiat:
+                    fiat = Fiat(
+                        code=order_data.fiat_code,
+                        name=order_data.fiat_code
+                    )
+                    self.db.add(fiat)
+                    self.db.commit()
+                    self.db.refresh(fiat)
+                fiat_map[order_data.fiat_code] = fiat
+
+        # Create all order objects
+        order_objects = []
+        for order_data in orders:
+            order = P2POrder(
+                exchange_id=exchange_map[order_data.exchange_name].id,
+                asset_id=asset_map[order_data.asset_symbol].id,
+                fiat_id=fiat_map[order_data.fiat_code].id,
+                snapshot_id=snapshot.id,
+
+                price=order_data.price,
+                order_type=order_data.order_type,
+                available_amount=order_data.available_amount,
+                min_amount=order_data.min_amount,
+                max_amount=order_data.max_amount,
+                payment_methods=order_data.payment_methods,
+                order_id=order_data.order_id,
+                user_id=order_data.user_id,
+                user_name=order_data.user_name,
+                completion_rate=order_data.completion_rate
+            )
+            order_objects.append(order)
+
+        self.db.bulk_save_objects(order_objects)
+        self.db.commit()
+
     
     def get_latest_snapshot(self) -> Optional[P2PSnapshot]:
         """
@@ -259,7 +341,85 @@ class SpotRepository:
         self.db.refresh(pair)
         
         return pair
-    
+
+    def add_pairs_batch(self, snapshot: SpotSnapshot, pairs: List[SpotPairDTO]) -> None:
+        """Add multiple Spot Pairs in a batch operation."""
+        # Collect all exchanges, asset, and fiats first
+        exchange_map = {}
+        asset_map = {}
+
+        # Preload or create all referenced entities
+        for pair_data in pairs:
+            if pair_data.exchange_name not in exchange_map:
+                exchange = self.db.query(Exchange).filter_by(name=pair_data.exchange_name).first()
+                if not exchange:
+                    # Create new exchange
+                    exchange_settings = next(
+                        (s for k, s in EXCHANGE_SETTINGS.items()
+                         if k.lower() == pair_data.exchange_name.lower() or
+                         s['base_url'].find(pair_data.exchange_name.lower()) != -1),
+                        {}
+                    )
+                    exchange = Exchange(
+                        name=pair_data.exchange_name,
+                        base_url=exchange_settings.get('base_url', ''),
+                        p2p_url=exchange_settings.get('p2p_url', '')
+                    )
+                    self.db.add(exchange)
+                    self.db.commit()
+                    self.db.refresh(exchange)
+
+                exchange_map[pair_data.exchange_name] = exchange
+
+            # Get or create Base Asset
+            if pair_data.base_asset_symbol not in asset_map:
+                base_asset = self.db.query(Asset).filter_by(symbol=pair_data.base_asset_symbol).first()
+                if not base_asset:
+                    base_asset = Asset(
+                        symbol=pair_data.base_asset_symbol,
+                        name=pair_data.base_asset_symbol
+                    )
+                    self.db.add(base_asset)
+                    self.db.commit()
+                    self.db.refresh(base_asset)
+                asset_map[pair_data.base_asset_symbol] = base_asset
+
+            # Get or create Quote Asset
+            if pair_data.quote_asset_symbol not in asset_map:
+                quote_asset = self.db.query(Asset).filter_by(symbol=pair_data.quote_asset_symbol).first()
+                if not quote_asset:
+                    quote_asset = Asset(
+                        symbol=pair_data.quote_asset_symbol,
+                        name=pair_data.quote_asset_symbol
+                    )
+                    self.db.add(quote_asset)
+                    self.db.commit()
+                    self.db.refresh(quote_asset)
+                asset_map[pair_data.quote_asset_symbol] = quote_asset
+
+        # Create all order objects
+        pair_objects = []
+        for pair_data in pairs:
+            pair = SpotPair(
+                exchange_id=exchange_map[pair_data.exchange_name].id,
+                base_asset_id=asset_map[pair_data.base_asset_symbol].id,
+                quote_asset_id=asset_map[pair_data.quote_asset_symbol].id,
+                snapshot_id=snapshot.id,
+                symbol=pair_data.symbol,
+                price=pair_data.price,
+                bid_price=pair_data.bid_price,
+                ask_price=pair_data.ask_price,
+                volume_24h=pair_data.volume_24h,
+                high_24h=pair_data.high_24h,
+                low_24h=pair_data.low_24h
+            )
+
+            pair_objects.append(pair)
+
+        self.db.bulk_save_objects(pair_objects)
+        self.db.commit()
+
+
     def get_latest_snapshot(self) -> Optional[SpotSnapshot]:
         """
         Get the latest spot snapshot.

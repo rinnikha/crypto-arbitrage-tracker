@@ -1,5 +1,5 @@
 # core/models.py
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, JSON, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, JSON, Boolean, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -18,6 +18,7 @@ class Exchange(Base):
     
     p2p_orders = relationship("P2POrder", back_populates="exchange")
     spot_pairs = relationship("SpotPair", back_populates="exchange")
+    payment_method_mappers = relationship("PaymentMethodMapper", back_populates="exchange")
 
 class Asset(Base):
     """Model for cryptocurrency assets."""
@@ -42,6 +43,32 @@ class Fiat(Base):
     created_at = Column(DateTime, default=datetime.now)
     
     p2p_orders = relationship("P2POrder", back_populates="fiat")
+    payment_methods = relationship("PaymentMethod", back_populates="fiat")
+
+class PaymentMethod(Base):
+    __tablename__ = "payment_methods"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+    fiat_id = Column(Integer, ForeignKey("fiats.id"))
+
+    payment_method_mappers = relationship("PaymentMethodMapper", back_populates="payment_method")
+
+    fiat = relationship("Fiat", back_populates="payment_methods")
+
+class PaymentMethodMapper(Base):
+    __tablename__ = "payment_method_mappers"
+
+    id = Column(Integer, primary_key=True)
+    exchange_id = Column(Integer, ForeignKey("exchanges.id"))
+    payment_method_id = Column(Integer, ForeignKey("payment_methods.id"))
+    mapping_key = Column(String, unique=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+    exchange = relationship("Exchange", back_populates="payment_method_mappers")
+    payment_method = relationship("PaymentMethod", back_populates="payment_method_mappers")
+
 
 class P2PSnapshot(Base):
     """Model for snapshots of P2P market data."""
@@ -92,6 +119,11 @@ class P2POrder(Base):
     asset = relationship("Asset", back_populates="p2p_orders")
     fiat = relationship("Fiat", back_populates="p2p_orders")
     snapshot = relationship("P2PSnapshot", back_populates="orders")
+
+    __table_args__ = (
+        Index('idx_p2p_orders_snapshot_exchange_asset', 'snapshot_id', 'exchange_id', 'asset_id'),
+        Index('idx_p2p_orders_order_id', 'order_id')
+    )
 
 class SpotPair(Base):
     """Model for spot market trading pairs."""
