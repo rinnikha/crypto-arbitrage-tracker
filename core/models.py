@@ -1,5 +1,6 @@
 # core/models.py
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, JSON, Boolean, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, JSON, Boolean, Index, ARRAY
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -14,6 +15,8 @@ class Exchange(Base):
     name = Column(String, unique=True, nullable=False)
     base_url = Column(String)
     p2p_url = Column(String)
+    fiat_currencies = Column(ARRAY(String), default=[])
+
     created_at = Column(DateTime, default=datetime.now)
     
     p2p_orders = relationship("P2POrder", back_populates="exchange")
@@ -104,12 +107,12 @@ class P2POrder(Base):
     available_amount = Column(Float)
     min_amount = Column(Float)
     max_amount = Column(Float)
-    payment_methods = Column(JSON)
+    payment_methods = Column(JSONB)
     
     # New fields for order tracking
-    order_id = Column(String)  # External order ID from exchange
-    user_id = Column(String)   # User ID from exchange
-    user_name = Column(String) # Username from exchange
+    order_id = Column(String, nullable=False)  # External order ID from exchange
+    user_id = Column(String, nullable=True)   # User ID from exchange
+    user_name = Column(String, nullable=True) # Username from exchange
     completion_rate = Column(Float)  # User's completion rate if available
     
     # Tracking data

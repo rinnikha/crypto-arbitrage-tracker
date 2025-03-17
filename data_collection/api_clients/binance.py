@@ -29,6 +29,7 @@ class BinanceCollector(BaseCollector):
     @retry_on_failure(max_retries=3)
     def fetch_p2p_orders(self, asset):
         """Fetch P2P prices for the given asset."""
+
         headers = {
             'Accept': '*/*',
             'User-Agent': 'Mozilla/5.0',
@@ -64,29 +65,33 @@ class BinanceCollector(BaseCollector):
         )
 
         buy_data = buy_response.json()
+        total_orders = buy_data['total']
+        loaded_orders = 0
         
         # Process buy orders
-        for order in buy_data.get('data', []):
-            adv = order.get('adv')
-            advertiser = order.get('advertiser', {})
+        while loaded_orders < total_orders:
+            for order in buy_data.get('data', []):
+                adv = order.get('adv')
+                advertiser = order.get('advertiser', {})
 
-            order = P2POrderDTO(
-                exchange_name="Binance",
-                asset_symbol=asset,
-                fiat_code='USD',
-                price=float(adv.get('price')),
-                order_type="BUY",
-                available_amount=float(adv.get('tradableQuantity', 0)),
-                min_amount=float(adv.get('minSingleTransAmount', 0)),
-                max_amount=float(adv.get('maxSingleTransAmount', 0)),
-                payment_methods=[pm.get('payType') for pm in adv.get('tradeMethods', [])],
-                
-                order_id=adv.get('advNo'),
-                user_id=advertiser.get('userNo'),
-                user_name=advertiser.get('nickName'),
-                completion_rate=float(advertiser.get('monthFinishRate', 0)) * 100
-            )
-            orders.append(order)
+                order = P2POrderDTO(
+                    exchange_name="Binance",
+                    asset_symbol=asset,
+                    fiat_code='USD',
+                    price=float(adv.get('price')),
+                    order_type="BUY",
+                    available_amount=float(adv.get('tradableQuantity', 0)),
+                    min_amount=float(adv.get('minSingleTransAmount', 0)),
+                    max_amount=float(adv.get('maxSingleTransAmount', 0)),
+                    payment_methods=[pm.get('payType') for pm in adv.get('tradeMethods', [])],
+
+                    order_id=adv.get('advNo'),
+                    user_id=advertiser.get('userNo'),
+                    user_name=advertiser.get('nickName'),
+                    completion_rate=float(advertiser.get('monthFinishRate', 0)) * 100
+                )
+                orders.append(order)
+                loaded_orders += 1
         
         # Process sell orders
         sell_response = make_request(
@@ -98,28 +103,33 @@ class BinanceCollector(BaseCollector):
 
         sell_data = sell_response.json()
 
-        for order in sell_data.get('data', []):
-            adv = order.get('adv')
-            advertiser = order.get('advertiser', {})
+        total_orders = buy_data['total']
+        loaded_orders = 0
 
-            order = P2POrderDTO(
-                exchange_name="Binance",
-                asset_symbol=asset,
-                fiat_code='USD',
-                price=float(adv.get('price')),
-                order_type="SELL",
-                available_amount=float(adv.get('tradableQuantity', 0)),
-                min_amount=float(adv.get('minSingleTransAmount', 0)),
-                max_amount=float(adv.get('maxSingleTransAmount', 0)),
-                payment_methods=[pm.get('payType') for pm in adv.get('tradeMethods', [])],
+        while loaded_orders < total_orders:
+            for order in sell_data.get('data', []):
+                adv = order.get('adv')
+                advertiser = order.get('advertiser', {})
 
-                order_id=adv.get('advNo'),
-                user_id=advertiser.get('userNo'),
-                user_name=advertiser.get('nickName'),
-                completion_rate=float(advertiser.get('monthFinishRate', 0)) * 100
-            )
-            orders.append(order)
-        
+                order = P2POrderDTO(
+                    exchange_name="Binance",
+                    asset_symbol=asset,
+                    fiat_code='USD',
+                    price=float(adv.get('price')),
+                    order_type="SELL",
+                    available_amount=float(adv.get('tradableQuantity', 0)),
+                    min_amount=float(adv.get('minSingleTransAmount', 0)),
+                    max_amount=float(adv.get('maxSingleTransAmount', 0)),
+                    payment_methods=[pm.get('payType') for pm in adv.get('tradeMethods', [])],
+
+                    order_id=adv.get('advNo'),
+                    user_id=advertiser.get('userNo'),
+                    user_name=advertiser.get('nickName'),
+                    completion_rate=float(advertiser.get('monthFinishRate', 0)) * 100
+                )
+                orders.append(order)
+                loaded_orders += 1
+
         return orders
     
     @retry_on_failure(max_retries=3)
@@ -138,6 +148,9 @@ class BinanceCollector(BaseCollector):
         for ticker in data:
             symbol = ticker.get('symbol', '')
 
+            # if not ticker['lastPrice'] or ticker['lastPrice'] == '0':
+            #     continue
+
             # Create spot pair DTO
             pair = SpotPairDTO(
                 exchange_name="Binance",
@@ -150,15 +163,9 @@ class BinanceCollector(BaseCollector):
                 low_24h=float(ticker.get('lowPrice', 0))
             )
 
-            # Filter by base/quote asset if provided
-            if base_asset and pair.base_asset_symbol != base_asset:
-                continue
+            if (pair.base_asset_symbol and pair.quote_asset_symbol) and pair.price != 0:
+                pairs.append(pair)
 
-            if quote_asset and pair.quote_asset_symbol != quote_asset:
-                continue
-
-            pairs.append(pair)
-        
         return pairs
     
     @retry_on_failure(max_retries=3)

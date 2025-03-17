@@ -6,6 +6,8 @@ from sqlalchemy import create_engine, NullPool, QueuePool
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 
+import os
+
 import threading
 
 from api.app import create_api, run_api
@@ -20,6 +22,8 @@ from data_collection.api_clients.ton_wallet import TonWalletCollector
 from data_storage.repositories import P2PRepository, SpotRepository
 from config.exchanges import EXCHANGE_SETTINGS, ASSETS
 from config.settings import DATABASE_URL, API_HOST, API_PORT, SNAPSHOT_INTERVAL_MINUTES
+
+
 # from ui.app import create_app
 
 # Configure logging
@@ -45,8 +49,52 @@ def init_database():
         pool_timeout=30,
         pool_recycle=1800
     )
-    Base.metadata.create_all(bind=engine)
+    # Base.metadata.create_all(bind=engine)
     return engine
+
+
+def check_migrations():
+    """Check if database migrations are up to date."""
+    from alembic.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from alembic.config import Config  # Import the Config class
+
+    # Create an Alembic configuration object
+    alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "alembic.ini"))
+
+    # Create a connection to check current version
+    engine = create_engine(DATABASE_URL)
+    connection = engine.connect()
+
+    # Get current database version
+    context = MigrationContext.configure(connection)
+    current_rev = context.get_current_revision()
+
+    # Get latest available version
+    script = ScriptDirectory.from_config(alembic_cfg)  # Use the initialized config object
+    head_rev = script.get_current_head()
+
+    if current_rev != head_rev:
+        logger.warning(f"Database schema is out of date! Current: {current_rev}, Latest: {head_rev}")
+        logger.warning("Run 'alembic upgrade head' to update.")
+
+        return False
+    else:
+        logger.info("Database schema is up to date.")
+
+        return True
+
+
+def run_migrations():
+    """Apply any pending database migrations."""
+    from alembic import command
+    from alembic.config import Config
+
+    # Only in development environment
+    if os.getenv("ENVIRONMENT") == "development":
+        logger.info("Applying database migrations...")
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
 
 def create_p2p_snapshot(p2p_manager):
     """Job to create a new P2P snapshot."""
@@ -94,6 +142,11 @@ def main():
     """Main entry point."""
     logger.info("Initializing Crypto Arbitrage Tracker...")
 
+    # Check migrations
+    if not check_migrations():
+        run_migrations()
+
+
     # Initialize the database
     engine = init_database()
 
@@ -109,7 +162,7 @@ def main():
             api_key=EXCHANGE_SETTINGS["binance"]["api_key"],
             api_secret=EXCHANGE_SETTINGS["binance"]["api_secret"]
         ))
-    
+
     # Bitget collector
     if EXCHANGE_SETTINGS["bitget"]["enabled"]:
         collectors.append(BitgetCollector(
@@ -120,32 +173,27 @@ def main():
     
     # Bybit collector
     if EXCHANGE_SETTINGS["bybit"]["enabled"]:
-        
-        
         collectors.append(BybitCollector(
             api_key=EXCHANGE_SETTINGS["bybit"]["api_key"],
             api_secret=EXCHANGE_SETTINGS["bybit"]["api_secret"]
         ))
 
-        
-    
+
     # MEXC collector
     if EXCHANGE_SETTINGS["mexc"]["enabled"]:
-        
-
         collectors.append(MexcCollector(
             api_key=EXCHANGE_SETTINGS["mexc"]["api_key"],
             api_secret=EXCHANGE_SETTINGS["mexc"]["api_secret"]
         ))
     
     # TON Wallet collector
-    # if EXCHANGE_SETTINGS["ton_wallet"]["enabled"]:
-    #     client = TonWalletCollector(api_token=EXCHANGE_SETTINGS["ton_wallet"]["api_token"])
-    #     client.fetch_p2p_orders(ASSETS)
-    #
-    #     collectors.append(TonWalletCollector(
-    #         api_token=EXCHANGE_SETTINGS["ton_wallet"]["api_token"]
-    #     ))
+    if EXCHANGE_SETTINGS["ton_wallet"]["enabled"]:
+        client = TonWalletCollector(api_token=EXCHANGE_SETTINGS["ton_wallet"]["api_token"])
+        client.fetch_p2p_orders(ASSETS)
+
+        collectors.append(TonWalletCollector(
+            api_token=EXCHANGE_SETTINGS["ton_wallet"]["api_token"]
+        ))
 
 
     
@@ -169,8 +217,8 @@ def main():
 
     
     # Set up and start the scheduler
-    scheduler = setup_scheduler(p2p_manager, spot_manager)
-    scheduler.start()
+    # scheduler = setup_scheduler(p2p_manager, spot_manager)
+    # scheduler.start()
 
     # Create repositories for API
     repositories = {
@@ -179,7 +227,7 @@ def main():
     }
 
     # Create API app
-    api = create_api(repositories)
+    # api = create_api(repositories)
     
     
     try:
@@ -187,14 +235,14 @@ def main():
         create_p2p_snapshot(p2p_manager)
         create_spot_snapshot(spot_manager)
         
-        run_api(api, host=API_HOST, port=API_PORT)
+        # run_api(api, host=API_HOST, port=API_PORT)
     except KeyboardInterrupt:
         logger.info("Shutting down...")
-        scheduler.shutdown()
+        # scheduler.shutdown()
         sys.exit(0)
     except Exception as e:
         logger.exception(f"Error running application: {e}")
-        scheduler.shutdown()
+        # scheduler.shutdown()
         sys.exit(1)
 
 if __name__ == "__main__":

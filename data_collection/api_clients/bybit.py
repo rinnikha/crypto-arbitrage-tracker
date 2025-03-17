@@ -137,13 +137,16 @@ class BybitCollector(BaseCollector):
                 
                 for ticker in tickers:
                     symbol = ticker.get('symbol', '')
+
+                    if symbol == '':
+                        continue
                     
                     # Attempt to split symbol into base and quote assets
                     # This is a simplistic approach - Bybit symbols may need special handling
                     base_asset_symbol = None
                     quote_asset_symbol = None
                     
-                    for quote in ["USDT", "USD", "BTC", "ETH"]:
+                    for quote in ["USDT", "USDC", "BTC", "ETH"]:
                         if symbol.endswith(quote):
                             quote_asset_symbol = quote
                             base_asset_symbol = symbol[:-len(quote)]
@@ -162,15 +165,10 @@ class BybitCollector(BaseCollector):
                         base_asset_symbol=base_asset_symbol,
                         quote_asset_symbol=quote_asset_symbol
                     )
-                    
-                    # Filter by base/quote asset if provided
-                    if base_asset and pair.base_asset_symbol != base_asset:
-                        continue
-                        
-                    if quote_asset and pair.quote_asset_symbol != quote_asset:
-                        continue
-                        
-                    pairs.append(pair)
+
+                    if (pair.base_asset_symbol and pair.quote_asset_symbol) and pair.price != 0:
+                        pairs.append(pair)
+
         except Exception as e:
             print(f"Error fetching Bybit spot pairs: {e}")
             pairs = []

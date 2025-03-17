@@ -43,7 +43,7 @@ class SpotPairDTO:
         if not self.base_asset_symbol or not self.quote_asset_symbol:
             # Common pattern is BTCUSDT where BTC is base and USDT is quote
             # This is a simple implementation - might need adjustment for some exchanges
-            common_quote_assets = ["USDT", "USD", "BTC", "ETH", "BNB"]
+            common_quote_assets = ["USDT", "USDC", "USD", "BTC", "ETH", "BNB"]
             
             for quote in common_quote_assets:
                 if self.symbol.endswith(quote):

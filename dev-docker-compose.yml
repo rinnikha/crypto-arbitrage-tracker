@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:14
+    container_name: crypto-tracker-postgres
+    environment:
+      POSTGRES_USER: cryptouser
+      POSTGRES_PASSWORD: cryptouser123
+      POSTGRES_DB: crypto_arbitrage
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Optional initialization scripts
+    restart: unless-stopped
+
+  # Optional: Add pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: crypto-tracker-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: minnikhanovrusdev@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: cryptouser123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -10,7 +10,7 @@ DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # Database settings
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///crypto_arbitrage.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://cryptouser:cryptouser123@localhost:5432/crypto_arbitrage")
 
 # Scheduler settings
 SNAPSHOT_INTERVAL_MINUTES = int(os.getenv("SNAPSHOT_INTERVAL_MINUTES", "5"))

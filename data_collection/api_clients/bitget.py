@@ -95,7 +95,6 @@ class BitgetCollector(BaseCollector):
                 "side": side,
                 "status": "online",
                 "orderBy": "price",
-                # "startTime": orders_timestamp,
                 "sourceType": "competitior"
             }
             
@@ -195,24 +194,19 @@ class BitgetCollector(BaseCollector):
                     pair = SpotPairDTO(
                         exchange_name="Bitget",
                         symbol=symbol,
-                        price=float(ticker.get('close', 0)),
-                        bid_price=float(ticker.get('bidPrice', 0)),
-                        ask_price=float(ticker.get('askPrice', 0)),
+                        price=float(ticker.get('lastPr', 0)),
+                        bid_price=float(ticker.get('bidPr', 0)),
+                        ask_price=float(ticker.get('askPr', 0)),
                         volume_24h=float(ticker.get('baseVolume', 0)),
                         high_24h=float(ticker.get('high24h', 0)),
                         low_24h=float(ticker.get('low24h', 0)),
                         base_asset_symbol=base_asset_symbol,
                         quote_asset_symbol=quote_asset_symbol
                     )
-                    
-                    # Filter by base/quote asset if provided
-                    if base_asset and pair.base_asset_symbol != base_asset:
-                        continue
-                        
-                    if quote_asset and pair.quote_asset_symbol != quote_asset:
-                        continue
-                        
-                    pairs.append(pair)
+
+                    if (pair.base_asset_symbol and pair.quote_asset_symbol) and pair.price != 0:
+                        pairs.append(pair)
+
         except Exception as e:
             print(f"Error fetching Bitget spot pairs: {e}")
             pairs = []
