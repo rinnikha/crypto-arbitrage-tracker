@@ -1,29 +1,39 @@
-# data_collection/api_clients/bitget.py
+"""
+Bitget data collector using the mapper framework.
+"""
+import logging
 import time
-from datetime import datetime
-import base64
-import uuid
 import hmac
-import json
 import hashlib
-import requests
+from typing import List, Dict, Any, Optional, Tuple
 from urllib.parse import urlencode
-from typing import List, Optional
 
 from core.dto import P2POrderDTO, SpotPairDTO
-from data_collection.base import BaseCollector
-from core.utils import retry_on_failure, make_request
+from data_collection.api_clients import RestApiCollector
+from core.utils.http import HttpClient, retry_on_failure
+from core.mapping import get_mapper_registry
+
+# Ensure mappers are initialized
+import data_collection.api_clients.mappers
+
+logger = logging.getLogger(__name__)
 
 orders_timestamp = int(time.time() * 1000) - (89 * 24 * 60 * 60 * 1000)
 
-class BitgetCollector(BaseCollector):
+class BitgetCollector(RestApiCollector):
     """Collector for Bitget exchange data."""
     
-    def __init__(self, api_key=None, api_secret=None, passphrase=None):
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self.passphrase = passphrase
-        self.base_url = "https://api.bitget.com"
+    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None, passphrase: Optional[str] = None):
+        """Initialize the Bitget collector."""
+        super().__init__(
+            exchange_name="Bitget",
+            base_url = "https://api.bitget.com",
+            api_key = api_key,
+            api_secret = api_secret,
+            passphrase = passphrase,
+        )
+
+        self.mapper_registry = get_mapper_registry()
 
 
     def _get_timestamp(self, servert_time=False):

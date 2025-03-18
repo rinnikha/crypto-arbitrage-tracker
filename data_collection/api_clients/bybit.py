@@ -7,8 +7,9 @@ from urllib.parse import urlencode
 from typing import List, Optional
 
 from core.dto import P2POrderDTO, SpotPairDTO
-from data_collection.base import BaseCollector
-from core.utils import retry_on_failure, make_request
+from core.utils.http import retry_on_failure
+from data_collection.api_clients import BaseCollector
+
 
 class BybitCollector(BaseCollector):
     """Collector for Bybit exchange data."""

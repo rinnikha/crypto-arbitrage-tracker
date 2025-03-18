@@ -5,7 +5,7 @@ import random
 
 
 from core.dto import P2POrderDTO
-from data_collection.base import BaseCollector
+from data_collection.api_clients import BaseCollector
 
 class GenericScraper(BaseCollector):
     """Generic web scraper for exchanges without APIs."""

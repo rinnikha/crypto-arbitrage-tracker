@@ -5,8 +5,8 @@ from datetime import datetime
 from typing import List, Optional
 
 from core.dto import P2POrderDTO, SpotPairDTO
-from data_collection.base import BaseCollector
-from core.utils import retry_on_failure, make_request
+from data_collection.api_clients import BaseCollector
+from core.utils.http import retry_on_failure, make_request
 from data_collection.scrapers.generic_scraper import GenericScraper
 
 class TonWalletCollector(BaseCollector):

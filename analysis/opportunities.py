@@ -4,7 +4,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 
 from data_storage.repositories import P2PRepository
-from core.utils import calculate_arbitrage_profit
+from core.utils.crypto import calculate_arbitrage_profit
 from config.exchanges import TRANSFER_METHODS
 
 @dataclass
