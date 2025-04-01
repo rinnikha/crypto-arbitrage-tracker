@@ -58,13 +58,14 @@ class P2PSnapshotManager(BaseSnapshotManager):
 
         for collector in self.collectors:
             exchange_name = collector.get_exchange_name()
+            fiats = ['USD', 'RUB', 'EUR', 'UZS']
             for asset in self.assets:
-                collection_tasks.append((collector, asset, exchange_name))
+                collection_tasks.append((collector, asset, fiats, exchange_name))
 
         # Execute collection tasks concurrently
         results = self.executor.execute(
             items=collection_tasks,
-            worker_func=lambda task: self._collect_p2p_orders(task[0], task[1], task[2], snapshot_id)
+            worker_func=lambda task: self._collect_p2p_orders(task[0], task[1], task[2], task[3], snapshot_id)
         )
 
         # Process results
@@ -119,7 +120,7 @@ class P2PSnapshotManager(BaseSnapshotManager):
 
         return result
 
-    def _collect_p2p_orders(self, collector: BaseCollector, asset: str,
+    def _collect_p2p_orders(self, collector: BaseCollector, asset: str, fiats: List[str],
                             exchange_name: str, snapshot_id: int) -> CollectionStats:
         """
         Collect P2P orders for a specific asset from a collector.
@@ -158,7 +159,7 @@ class P2PSnapshotManager(BaseSnapshotManager):
             logger.info(f"Collecting P2P orders for {asset} from {exchange_name}")
 
             try:
-                orders = collector.fetch_p2p_orders(asset)
+                orders = collector.fetch_p2p_orders(asset, fiats)
                 stats.total_items = len(orders)
                 stats.assets[asset] = len(orders)
 

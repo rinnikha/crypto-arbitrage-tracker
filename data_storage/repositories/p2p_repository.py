@@ -78,6 +78,7 @@ class P2PRepository(BaseRepository[P2POrder, P2POrderDTO]):
             snapshot = P2PSnapshot(timestamp=timestamp)
             self.db.add(snapshot)
             self.db.flush()
+            self.db.commit()
 
             logger.info(f"Created P2P snapshot with ID {snapshot.id} at {timestamp}")
             return snapshot

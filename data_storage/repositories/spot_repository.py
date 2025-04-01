@@ -50,6 +50,8 @@ class SpotRepository(BaseRepository[SpotPair, SpotPairDTO]):
             self.db.add(snapshot)
             self.db.flush()
 
+            self.db.commit()
+
             logger.info(f"Created spot snapshot with ID {snapshot.id} at {timestamp}")
             return snapshot
 
@@ -111,70 +113,94 @@ class SpotRepository(BaseRepository[SpotPair, SpotPairDTO]):
         start_time = time.time()
         logger.info(f"Starting batch insert of {len(pairs)} spot pairs")
 
-        with self.transaction():
-            # Prepare all assets
-            base_asset_symbols = [pair.base_asset_symbol for pair in pairs]
-            quote_asset_symbols = [pair.quote_asset_symbol for pair in pairs]
-            all_symbols = list(set(base_asset_symbols + quote_asset_symbols))
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                with self.transaction():
+                    # Prepare all assets
+                    base_asset_symbols = [pair.base_asset_symbol for pair in pairs]
+                    quote_asset_symbols = [pair.quote_asset_symbol for pair in pairs]
+                    all_symbols = list(set(base_asset_symbols + quote_asset_symbols))
 
-            asset_map = self._prepare_assets(all_symbols)
-            exchange_map = self._prepare_exchanges([pair.exchange_name for pair in pairs])
+                    asset_map = self._prepare_assets(all_symbols)
+                    exchange_map = self._prepare_exchanges([pair.exchange_name for pair in pairs])
 
-            # Prepare rows for batch insert
-            rows = []
-            for pair in pairs:
-                # Skip if missing required references
-                exchange_name = pair.exchange_name
-                base_symbol = pair.base_asset_symbol
-                quote_symbol = pair.quote_asset_symbol
+                    # Prepare rows for batch insert
+                    rows = []
+                    for pair in pairs:
+                        # Skip if missing required references
+                        exchange_name = pair.exchange_name
+                        base_symbol = pair.base_asset_symbol
+                        quote_symbol = pair.quote_asset_symbol
 
-                if not base_symbol or not quote_symbol:
-                    logger.warning(f"Missing asset symbols for pair {pair.symbol}, skipping")
+                        if not base_symbol or not quote_symbol:
+                            logger.warning(f"Missing asset symbols for pair {pair.symbol}, skipping")
+                            continue
+
+                        if exchange_name not in exchange_map:
+                            logger.warning(f"Missing exchange {exchange_name} for pair, skipping")
+                            continue
+                        if base_symbol not in asset_map:
+                            logger.warning(f"Missing base asset {base_symbol} for pair, skipping")
+                            continue
+                        if quote_symbol not in asset_map:
+                            logger.warning(f"Missing quote asset {quote_symbol} for pair, skipping")
+                            continue
+
+                        rows.append((
+                            exchange_map[exchange_name].id,
+                            asset_map[base_symbol].id,
+                            asset_map[quote_symbol].id,
+                            snapshot.id,
+                            pair.symbol,
+                            float(pair.price or 0),
+                            float(pair.bid_price or 0),
+                            float(pair.ask_price or 0),
+                            float(pair.volume_24h or 0),
+                            float(pair.high_24h or 0),
+                            float(pair.low_24h or 0),
+                            datetime.now()
+                        ))
+
+                    # Execute batch insert
+                    if rows:
+                        columns = [
+                            "exchange_id", "base_asset_id", "quote_asset_id", "snapshot_id",
+                            "symbol", "price", "bid_price", "ask_price",
+                            "volume_24h", "high_24h", "low_24h", "created_at"
+                        ]
+
+                        inserted = self.batch_insert(rows, columns, "spot_pairs")
+                        logger.info(f"Inserted {inserted} spot pairs in batch")
+
+                        duration = time.time() - start_time
+                        logger.info(f"Batch insert completed in {duration:.2f} seconds")
+
+                        return inserted
+                    else:
+                        logger.warning("No valid pairs to insert")
+                        return 0
+
+            except Exception as e:
+                retry_count += 1
+                error_msg = str(e)
+                logger.warning(f"Attempt {retry_count}/{max_retries} failed: {error_msg}")
+                
+                if "violates foreign key constraint" in error_msg and retry_count < max_retries:
+                    # If it's a foreign key violation, wait a bit before retrying
+                    logger.info(f"Foreign key violation detected, retrying in 1 second...")
+                    time.sleep(1)
                     continue
+                elif retry_count >= max_retries:
+                    logger.error(f"Maximum retry attempts reached. Last error: {error_msg}")
+                    raise
+                else:
+                    # For other errors, re-raise immediately
+                    raise
 
-                if exchange_name not in exchange_map:
-                    logger.warning(f"Missing exchange {exchange_name} for pair, skipping")
-                    continue
-                if base_symbol not in asset_map:
-                    logger.warning(f"Missing base asset {base_symbol} for pair, skipping")
-                    continue
-                if quote_symbol not in asset_map:
-                    logger.warning(f"Missing quote asset {quote_symbol} for pair, skipping")
-                    continue
-
-                rows.append((
-                    exchange_map[exchange_name].id,
-                    asset_map[base_symbol].id,
-                    asset_map[quote_symbol].id,
-                    snapshot.id,
-                    pair.symbol,
-                    float(pair.price or 0),
-                    float(pair.bid_price or 0),
-                    float(pair.ask_price or 0),
-                    float(pair.volume_24h or 0),
-                    float(pair.high_24h or 0),
-                    float(pair.low_24h or 0),
-                    datetime.now()
-                ))
-
-            # Execute batch insert
-            if rows:
-                columns = [
-                    "exchange_id", "base_asset_id", "quote_asset_id", "snapshot_id",
-                    "symbol", "price", "bid_price", "ask_price",
-                    "volume_24h", "high_24h", "low_24h", "created_at"
-                ]
-
-                inserted = self.batch_insert(rows, columns, "spot_pairs")
-                logger.info(f"Inserted {inserted} spot pairs in batch")
-
-                duration = time.time() - start_time
-                logger.info(f"Batch insert completed in {duration:.2f} seconds")
-
-                return inserted
-            else:
-                logger.warning("No valid pairs to insert")
-                return 0
+        return 0  # Should not reach here, but just in case
 
     def get_latest_snapshot(self) -> Optional[SpotSnapshot]:
         """
@@ -381,6 +407,8 @@ class SpotRepository(BaseRepository[SpotPair, SpotPairDTO]):
             # Batch add all new exchanges
             self.db.add_all(exchanges_to_create)
             self.db.flush()
+            # Commit the changes to ensure they're visible to other transactions
+            self.db.commit()
 
             # Cache new exchanges
             for exchange in exchanges_to_create:
@@ -438,6 +466,8 @@ class SpotRepository(BaseRepository[SpotPair, SpotPairDTO]):
             # Batch add all new assets
             self.db.add_all(assets_to_create)
             self.db.flush()
+            # Commit the changes to ensure they're visible to other transactions
+            self.db.commit()
 
             # Cache new assets
             for asset in assets_to_create:

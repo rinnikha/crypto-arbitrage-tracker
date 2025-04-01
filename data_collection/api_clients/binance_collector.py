@@ -8,6 +8,7 @@ import hashlib
 from typing import List, Dict, Any, Optional, Tuple
 from urllib.parse import urlencode
 
+from core.cache import SymbolInfoCache
 from core.dto import P2POrderDTO, SpotPairDTO
 from data_collection.api_clients import  RestApiCollector
 from core.utils.http import HttpClient
@@ -74,43 +75,43 @@ class BinanceCollector(RestApiCollector):
 
         return headers
 
-    def fetch_p2p_orders(self, asset: str) -> List[P2POrderDTO]:
+    def fetch_p2p_orders(self, asset: str, fiats: List[str]) -> List[P2POrderDTO]:
         """Fetch P2P orders from Binance using the mapper."""
-        fiat = "USD"  # Default fiat currency
         orders = []
 
-        # Process both buy and sell orders
-        for trade_type in ["BUY", "SELL"]:
-            payload = {
-                "asset": asset,
-                "fiat": fiat,
-                "page": 1,
-                "rows": 20,
-                "tradeType": trade_type
-            }
+        # Process buy, sell and different fiat orders
+        for fiat in fiats:
+            for trade_type in ["BUY", "SELL"]:
+                payload = {
+                    "asset": asset,
+                    "fiat": fiat,
+                    "page": 1,
+                    "rows": 20,
+                    "tradeType": trade_type
+                }
 
-            try:
-                response = self.p2p_client.post(
-                    endpoint="/bapi/c2c/v2/friendly/c2c/adv/search",
-                    json_data=payload
-                )
+                try:
+                    response = self.p2p_client.post(
+                        endpoint="/bapi/c2c/v2/friendly/c2c/adv/search",
+                        json_data=payload
+                    )
 
-                data = response.json()
+                    data = response.json()
 
-                # Prepare data for mapping
-                # for order_data in data.get('data', []):
-                #     # Add asset and trade type to the data for mapping
+                    # Prepare data for mapping
+                    # for order_data in data.get('data', []):
+                    #     # Add asset and trade type to the data for mapping
 
-                # Use the mapper to convert to DTOs
-                new_orders = self.mapper_registry.map_many(
-                    "binance_p2p_order",
-                    data.get('data', [])
-                )
+                    # Use the mapper to convert to DTOs
+                    new_orders = self.mapper_registry.map_many(
+                        "binance_p2p_order",
+                        data.get('data', [])
+                    )
 
-                orders.extend(new_orders)
+                    orders.extend(new_orders)
 
-            except Exception as e:
-                logger.error(f"Error fetching Binance {trade_type} P2P orders for {asset}: {e}")
+                except Exception as e:
+                    logger.error(f"Error fetching Binance {trade_type} P2P orders {asset} - {fiat}: {e}")
 
         return orders
 
@@ -118,8 +119,8 @@ class BinanceCollector(RestApiCollector):
                          quote_asset: Optional[str] = None) -> List[SpotPairDTO]:
         """Fetch spot market pairs from Binance using the mapper."""
         try:
-            # Get symbols info
-            symbol_info = self._fetch_symbols_info()
+            # Get symbol info from cache
+            symbol_cache = SymbolInfoCache.get_instance()
 
             # Get ticker data
             ticker_data = self._fetch_ticker_data()
@@ -129,24 +130,26 @@ class BinanceCollector(RestApiCollector):
             for ticker in ticker_data:
                 symbol = ticker.get('symbol', '')
 
+                # Get symbol info from cache
+                symbol_info = symbol_cache.get_symbol_info("binance", symbol)
+                base = symbol_info.get('base_asset', '')
+                quote = symbol_info.get('quote_asset', '')
+
                 # Filter by base/quote asset if provided
-                if base_asset or quote_asset:
-                    if symbol not in symbol_info:
-                        continue
+                if base_asset and base != base_asset:
+                    continue
 
-                    base, quote = symbol_info[symbol]
+                if quote_asset and quote != quote_asset:
+                    continue
 
-                    if base_asset and base != base_asset:
-                        continue
+                if base and quote:
+                    ticker['baseAsset'] = base
+                    ticker['quoteAsset'] = quote
 
-                    if quote_asset and quote != quote_asset:
-                        continue
-
-                # Create combined data for the mapper
-                pairs_data.append({
-                    'ticker': ticker,
-                    'symbol_info': symbol_info
-                })
+                    # Create combined data for the mapper
+                    pairs_data.append(ticker)
+                else:
+                    logger.warning(f"Symbol {symbol} not found in Binance Symbol's info")
 
             # Use the mapper to convert to DTOs
             return self.mapper_registry.map_many("binance_spot_pair", pairs_data)
@@ -154,23 +157,6 @@ class BinanceCollector(RestApiCollector):
         except Exception as e:
             logger.error(f"Error fetching Binance spot pairs: {e}")
             return []
-
-    def _fetch_symbols_info(self) -> Dict[str, Tuple[str, str]]:
-        """Fetch and process trading symbols info."""
-        symbols_response = self.http_client.get("/api/v3/exchangeInfo")
-        symbols_data = symbols_response.json()
-
-        # Create a mapping of symbol -> (baseAsset, quoteAsset)
-        symbol_info = {}
-        for symbol_data in symbols_data.get('symbols', []):
-            symbol = symbol_data.get('symbol')
-            base = symbol_data.get('baseAsset')
-            quote = symbol_data.get('quoteAsset')
-
-            if symbol and base and quote:
-                symbol_info[symbol] = (base, quote)
-
-        return symbol_info
 
     def _fetch_ticker_data(self) -> List[Dict[str, Any]]:
         """Fetch 24-hour ticker data."""

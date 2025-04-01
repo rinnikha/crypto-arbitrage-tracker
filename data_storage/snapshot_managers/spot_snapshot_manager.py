@@ -147,13 +147,11 @@ class SpotSnapshotManager(BaseSnapshotManager):
                 # Filter pairs by configured assets
                 filtered_pairs = []
                 for pair in all_pairs:
-                    if (pair.base_asset_symbol in self.base_assets and
-                            pair.quote_asset_symbol in self.quote_assets):
-                        filtered_pairs.append(pair)
+                    filtered_pairs.append(pair)
 
-                        # Update asset stats
-                        base_symbol = pair.base_asset_symbol
-                        stats.assets[base_symbol] = stats.assets.get(base_symbol, 0) + 1
+                    # Update asset stats
+                    base_symbol = pair.base_asset_symbol
+                    stats.assets[base_symbol] = stats.assets.get(base_symbol, 0) + 1
 
                 stats.total_items = len(filtered_pairs)
 

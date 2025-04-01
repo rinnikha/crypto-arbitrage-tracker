@@ -43,7 +43,7 @@ SNAPSHOT_INTERVAL_MINUTES = int(os.getenv("SNAPSHOT_INTERVAL_MINUTES", "5"))
 CONCURRENT_COLLECTORS = int(os.getenv("CONCURRENT_COLLECTORS", "5"))
 
 # Assets to track
-ASSETS = os.getenv("ASSETS", "USDT,BTC,ETH,TON").split(",")
+ASSETS = os.getenv("ASSETS", "USDT,BTC,ETH").split(",")
 QUOTE_ASSETS = os.getenv("QUOTE_ASSETS", "USDT,USD").split(",")
 
 # Cache settings

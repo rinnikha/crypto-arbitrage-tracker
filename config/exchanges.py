@@ -24,7 +24,6 @@ BITGET_P2P_URL = "https://api.bitget.com/api/spot/v1/p2p/merchant/advertise/list
 BITGET_SPOT_BATCH_SIZE = 100
 BITGET_P2P_BATCH_SIZE = 20
 BITGET_FIAT_CURRENCIES = ["USD", "EUR"]
-BITGET_DEFAULT_FIAT = "USD"
 
 # Bybit Settings
 BYBIT_ENABLED = os.getenv("BYBIT_ENABLED", "True").lower() in ("true", "yes", "1", "y")
@@ -35,7 +34,6 @@ BYBIT_P2P_URL = "https://api.bybit.com/v5/spot/c2c/order-book"
 BYBIT_SPOT_BATCH_SIZE = 50
 BYBIT_P2P_BATCH_SIZE = 20
 BYBIT_FIAT_CURRENCIES = ["USD", "EUR"]
-BYBIT_DEFAULT_FIAT = "USD"
 
 # MEXC Settings
 MEXC_ENABLED = os.getenv("MEXC_ENABLED", "True").lower() in ("true", "yes", "1", "y")
@@ -46,7 +44,6 @@ MEXC_P2P_URL = "https://otc.mexc.com/api"
 MEXC_SPOT_BATCH_SIZE = 50
 MEXC_P2P_BATCH_SIZE = 20
 MEXC_FIAT_CURRENCIES = ["USD"]
-MEXC_DEFAULT_FIAT = "USD"
 
 # TON Wallet Settings
 TON_ENABLED = os.getenv("TON_ENABLED", "True").lower() in ("true", "yes", "1", "y")
@@ -55,7 +52,6 @@ TON_BASE_URL = "https://toncenter.com/api/v2"
 TON_SPOT_BATCH_SIZE = 10
 TON_P2P_BATCH_SIZE = 10
 TON_FIAT_CURRENCIES = ["USD"]
-TON_DEFAULT_FIAT = "USD"
 
 # Transfer fees
 BINANCE_BITGET_FEE = float(os.getenv("BINANCE_BITGET_FEE", "1.0"))
@@ -90,7 +86,6 @@ EXCHANGE_SETTINGS = {
         "spot_batch_size": BINANCE_SPOT_BATCH_SIZE,
         "p2p_batch_size": BINANCE_P2P_BATCH_SIZE,
         "fiat_currencies": BINANCE_FIAT_CURRENCIES,
-        "default_fiat": BINANCE_DEFAULT_FIAT
     },
     "bitget": {
         "enabled": BITGET_ENABLED,
@@ -102,7 +97,6 @@ EXCHANGE_SETTINGS = {
         "spot_batch_size": BITGET_SPOT_BATCH_SIZE,
         "p2p_batch_size": BITGET_P2P_BATCH_SIZE,
         "fiat_currencies": BITGET_FIAT_CURRENCIES,
-        "default_fiat": BITGET_DEFAULT_FIAT
     },
     "bybit": {
         "enabled": BYBIT_ENABLED,
@@ -112,8 +106,7 @@ EXCHANGE_SETTINGS = {
         "p2p_url": BYBIT_P2P_URL,
         "spot_batch_size": BYBIT_SPOT_BATCH_SIZE,
         "p2p_batch_size": BYBIT_P2P_BATCH_SIZE,
-        "fiat_currencies": BYBIT_FIAT_CURRENCIES,
-        "default_fiat": BYBIT_DEFAULT_FIAT
+        "fiat_currencies": BYBIT_FIAT_CURRENCIES
     },
     "mexc": {
         "enabled": MEXC_ENABLED,
@@ -123,8 +116,7 @@ EXCHANGE_SETTINGS = {
         "p2p_url": MEXC_P2P_URL,
         "spot_batch_size": MEXC_SPOT_BATCH_SIZE,
         "p2p_batch_size": MEXC_P2P_BATCH_SIZE,
-        "fiat_currencies": MEXC_FIAT_CURRENCIES,
-        "default_fiat": MEXC_DEFAULT_FIAT
+        "fiat_currencies": MEXC_FIAT_CURRENCIES
     },
     "ton_wallet": {
         "enabled": TON_ENABLED,
@@ -132,8 +124,7 @@ EXCHANGE_SETTINGS = {
         "base_url": TON_BASE_URL,
         "spot_batch_size": TON_SPOT_BATCH_SIZE,
         "p2p_batch_size": TON_P2P_BATCH_SIZE,
-        "fiat_currencies": TON_FIAT_CURRENCIES,
-        "default_fiat": TON_DEFAULT_FIAT
+        "fiat_currencies": TON_FIAT_CURRENCIES
     }
 }
 

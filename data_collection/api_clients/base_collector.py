@@ -44,12 +44,13 @@ class BaseCollector(ABC):
         self.api_key = api_key
 
     @abstractmethod
-    def fetch_p2p_orders(self, asset: str) -> List[P2POrderDTO]:
+    def fetch_p2p_orders(self, asset: str, fiats: List[str]) -> List[P2POrderDTO]:
         """
         Fetch P2P orders for the given asset.
 
         Args:
             asset: Asset symbol
+            fiats: Fiat symbol
 
         Returns:
             List of P2P order DTOs

@@ -60,6 +60,9 @@ class Application:
         # Initialize database
         self._init_database()
 
+        # Initialize caches
+        self._init_caches()
+
         # Initialize collectors
         self._init_collectors()
 
@@ -100,7 +103,26 @@ class Application:
         self.db_engine = engine
         self.db_session = next(get_db(engine))
 
+        # Seed database with initial data if in development mode
+        if self.config.get('ENVIRONMENT', 'development') == 'development':
+            from data_storage.seed import seed_database
+            seed_database(self.db_session)
+
         logger.info("Database initialized")
+
+    def _init_caches(self) -> None:
+        """Initialize data caches."""
+        logger.info("Initializing reference data caches...")
+
+        from core.cache import initialize_caches, setup_cache_refresh
+
+        # Initialize caches with initial data
+        initialize_caches()
+
+        # Set up periodic cache refresh
+        self.cache_scheduler = setup_cache_refresh()
+
+        logger.info("Reference data caches initialized")
 
     def _init_collectors(self) -> None:
         """Initialize data collectors."""
@@ -110,11 +132,11 @@ class Application:
         exchange_settings = self.config.get('EXCHANGE_SETTINGS', {})
 
         # Import collector classes
-        from data_collection.api_clients.binance_collector import BinanceCollector
-        from data_collection.api_clients.bitget import BitgetCollector
-        from data_collection.api_clients.bybit import BybitCollector
-        from data_collection.api_clients.mexc import MexcCollector
-        from data_collection.api_clients.ton_wallet import TonWalletCollector
+        from data_collection.api_clients import BinanceCollector
+        from data_collection.api_clients import BitgetCollector
+        from data_collection.api_clients import BybitCollector
+        from data_collection.api_clients import MexcCollector
+        from data_collection.api_clients import TonWalletCollector
 
         # Initialize collectors
         self.collectors = []
@@ -129,32 +151,32 @@ class Application:
             logger.info("Initialized Binance collector")
 
         # Bitget collector
-        # if exchange_settings.get('bitget', {}).get('enabled', True):
-        #     bitget_settings = exchange_settings.get('bitget', {})
-        #     self.collectors.append(BitgetCollector(
-        #         api_key=bitget_settings.get('api_key'),
-        #         api_secret=bitget_settings.get('api_secret'),
-        #         passphrase=bitget_settings.get('passphrase')
-        #     ))
-        #     logger.info("Initialized Bitget collector")
+        if exchange_settings.get('bitget', {}).get('enabled', True):
+            bitget_settings = exchange_settings.get('bitget', {})
+            self.collectors.append(BitgetCollector(
+                api_key=bitget_settings.get('api_key'),
+                api_secret=bitget_settings.get('api_secret'),
+                passphrase=bitget_settings.get('passphrase')
+            ))
+            logger.info("Initialized Bitget collector")
 
         # Bybit collector
-        # if exchange_settings.get('bybit', {}).get('enabled', True):
-        #     bybit_settings = exchange_settings.get('bybit', {})
-        #     self.collectors.append(BybitCollector(
-        #         api_key=bybit_settings.get('api_key'),
-        #         api_secret=bybit_settings.get('api_secret')
-        #     ))
-        #     logger.info("Initialized Bybit collector")
+        if exchange_settings.get('bybit', {}).get('enabled', True):
+            bybit_settings = exchange_settings.get('bybit', {})
+            self.collectors.append(BybitCollector(
+                api_key=bybit_settings.get('api_key'),
+                api_secret=bybit_settings.get('api_secret')
+            ))
+            logger.info("Initialized Bybit collector")
 
         # MEXC collector
-        # if exchange_settings.get('mexc', {}).get('enabled', True):
-        #     mexc_settings = exchange_settings.get('mexc', {})
-        #     self.collectors.append(MexcCollector(
-        #         api_key=mexc_settings.get('api_key'),
-        #         api_secret=mexc_settings.get('api_secret')
-        #     ))
-        #     logger.info("Initialized MEXC collector")
+        if exchange_settings.get('mexc', {}).get('enabled', True):
+            mexc_settings = exchange_settings.get('mexc', {})
+            self.collectors.append(MexcCollector(
+                api_key=mexc_settings.get('api_key'),
+                api_secret=mexc_settings.get('api_secret')
+            ))
+            logger.info("Initialized MEXC collector")
 
         # TON Wallet collector
         # if exchange_settings.get('ton_wallet', {}).get('enabled', True):
@@ -171,7 +193,7 @@ class Application:
         logger.info("Initializing repositories and snapshot managers...")
 
         # Get assets list
-        assets = self.config.get('ASSETS', ["USDT", "BTC", "ETH", "TON"])
+        assets = self.config.get('ASSETS', ["USDT", "BTC", "ETH"])
 
         # Initialize repositories
         p2p_repo = P2PRepository(self.db_session)
@@ -337,6 +359,11 @@ class Application:
             return
 
         logger.info("Shutting down Crypto Arbitrage Tracker...")
+
+        # Shutdown cache scheduler if exists
+        if hasattr(self, 'cache_scheduler') and self.cache_scheduler:
+            self.cache_scheduler.shutdown()
+            logger.info("Cache scheduler stopped")
 
         # Shutdown scheduler
         if self.scheduler:
